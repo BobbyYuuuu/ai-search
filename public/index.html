@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SimpleSearch + AI</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root{--border:#e0e0e0;--shadow:0 2px 12px rgba(0,0,0,.08)}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111}
+    .wrap{min-height:40vh;display:grid;place-items:center}
+    .box{text-align:center;margin-top:6vh}
+    .logo{font-size:56px;font-weight:700;letter-spacing:.5px;margin-bottom:24px}
+    .search{display:flex;gap:10px;align-items:center;max-width:640px;margin:0 auto;padding:10px 14px;border:1px solid var(--border);border-radius:999px;box-shadow:var(--shadow);}
+    .search input{flex:1;border:none;outline:none;font-size:18px;padding:8px 6px;background:transparent}
+    .btns{margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+    .btns a,.btns button{border:1px solid var(--border);padding:9px 14px;border-radius:8px;background:white;cursor:pointer;text-decoration:none}
+    footer{position:fixed;bottom:0;left:0;right:0;text-align:center;padding:16px;color:#666;border-top:1px solid #f0f0f0;background:#fff}
+    .preview{max-width:100%;border:1px solid #eee;border-radius:12px}
+    .result{white-space:pre-wrap;line-height:1.6;margin-top:8px}
+    h2{margin:8px 0 12px}
+
+    /* Popup dock near the search bar */
+    .popdock{position:fixed;top:var(--dockTop,220px);left:50%;transform:translateX(-50%);width:min(1100px,95vw);display:flex;gap:16px;justify-content:center;align-items:flex-start;flex-wrap:wrap;pointer-events:none;z-index:9999}
+    .popup{width:min(520px, 95vw);max-height:75vh;overflow:auto;background:#fff;border:1px solid #eee;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.16);display:none;pointer-events:auto}
+    .popup.show{display:block}
+    .popup header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;border-top-left-radius:16px;border-top-right-radius:16px}
+    .popup h3{margin:0;font-size:16px}
+    .popup .close{border:1px solid #e0e0e0;border-radius:8px;background:#fff;padding:6px 10px;cursor:pointer}
+
+    img.preview[hidden]{display:none !important}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="box">
+      <div class="logo">Simple<span style="color:#1a73e8">Search</span> + AI</div>
+      <form class="search" action="results.html">
+        <input name="q" id="q" autocomplete="off" placeholder="Ask anything..." />
+        <button type="submit">Search</button>
+      </form>
+      <div class="btns">
+        <button type="button" id="example">Try: renew passport</button>
+        <button type="button" id="toggleVision">Analyze an image</button>
+        <button type="button" id="toggleGen">Generate an image</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup dock container (panels are injected below) -->
+  <div class="popdock" id="popdock">
+    <div class="popup" id="popupVision">
+      <header><h3>Image Analyzer</h3><button class="close" id="closeVision">Close</button></header>
+      <div style="padding:12px">
+        <p>Upload a photo or screenshot and (optionally) ask a question. You'll get text analysis and a captioned copy.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div>
+            <label for="file" style="font-weight:600">Choose image</label><br>
+            <input type="file" id="file" accept="image/*">
+          </div>
+          <div style="flex:1;min-width:220px">
+            <label for="prompt" style="font-weight:600">Question (optional)</label><br>
+            <input id="prompt" placeholder="e.g., What does this chart show?" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:10px">
+          </div>
+          <div style="flex:0 0 180px">
+            <button id="analyzeBtn" style="width:100%;">Analyze Image</button>
+          </div>
+        </div>
+        <div id="imgStatus" class="result"></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+          <div style="flex:1;min-width:200px">
+            <h4>Original</h4>
+            <img id="orig" class="preview" alt="original" hidden>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <h4>Captioned</h4>
+            <img id="anno" class="preview" alt="captioned" hidden>
+          </div>
+        </div>
+        <h4>Analysis</h4>
+        <div id="imgAnswer" class="result"></div>
+      </div>
+    </div>
+
+    <div class="popup" id="popupGen">
+      <header><h3>Image Generator</h3><button class="close" id="closeGen">Close</button></header>
+      <div style="padding:12px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div style="flex:2">
+            <input id="genPrompt" placeholder="Describe the image (e.g., a simple full black image)" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:10px">
+          </div>
+          <div style="flex:0 0 160px">
+            <select id="genSize" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:10px">
+              <option>1024x1024</option><option>512x512</option><option>256x256</option>
+            </select>
+          </div>
+          <div style="flex:0 0 140px">
+            <button id="genBtn" style="width:100%;">Generate</button>
+          </div>
+        </div>
+        <div id="genMsg" class="result"></div>
+        <img id="genOut" class="preview" style="margin-top:8px" alt="generated" hidden>
+      </div>
+    </div>
+  </div>
+
+  <footer>Java backend on port 8080 · <a href="about.html">About</a></footer>
+
+  <script>
+    // Use same-origin in production; when on VS Code Live Server (localhost:5500), target localhost:8080 for API
+    const API_BASE = (location.hostname === 'localhost' && location.port === '5500') ? 'http://localhost:8080' : '';
+
+    // helper to reveal images only when loaded
+    function showImage(el, url) {
+      el.hidden = true;
+      el.onload  = () => { el.hidden = false; };
+      el.onerror = () => { el.hidden = true; el.removeAttribute('src'); };
+      el.src = url;
+    }
+
+    // position popups under the search bar
+    function updateDockPosition(){
+      const dock = document.getElementById('popdock');
+      const search = document.querySelector('.search');
+      if (!dock || !search) return;
+      const r = search.getBoundingClientRect();
+      const top = Math.max(100, Math.round(r.bottom + 16));
+      document.documentElement.style.setProperty('--dockTop', top + 'px');
+    }
+    window.addEventListener('load', updateDockPosition);
+    window.addEventListener('resize', updateDockPosition);
+    window.addEventListener('scroll', updateDockPosition, {passive:true});
+
+    document.getElementById('example').onclick = () => {
+      const v = 'What are the steps to renew a passport? Give a short checklist.';
+      document.getElementById('q').value = v;
+      location.href = 'results.html?q=' + encodeURIComponent(v);
+    };
+
+    // Wire popups + inner actions
+    document.addEventListener('DOMContentLoaded', () => {
+      const popupVision = document.getElementById('popupVision');
+      const popupGen = document.getElementById('popupGen');
+      const btnVision = document.getElementById('toggleVision');
+      const btnGen = document.getElementById('toggleGen');
+      const closeVision = document.getElementById('closeVision');
+      const closeGen = document.getElementById('closeGen');
+
+      function toggle(el){ if (el) el.classList.toggle('show'); updateDockPosition(); }
+      btnVision?.addEventListener('click', ()=> toggle(popupVision));
+      btnGen?.addEventListener('click', ()=> toggle(popupGen));
+      closeVision?.addEventListener('click', ()=> popupVision && popupVision.classList.remove('show'));
+      closeGen?.addEventListener('click', ()=> popupGen && popupGen.classList.remove('show'));
+
+      // Analyze
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      analyzeBtn?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const file = document.getElementById('file').files[0];
+        const prompt = document.getElementById('prompt').value.trim();
+        const status = document.getElementById('imgStatus');
+        const orig = document.getElementById('orig');
+        const anno = document.getElementById('anno');
+        const ans = document.getElementById('imgAnswer');
+        status.textContent = 'Uploading...';
+        ans.textContent = '';
+        if (orig) { orig.hidden = true; orig.removeAttribute('src'); }
+        if (anno) { anno.hidden = true; anno.removeAttribute('src'); }
+        try {
+          const fd = new FormData();
+          if (file) fd.append('image', file);
+          if (prompt) fd.append('q', prompt);
+          const r = await fetch(`${API_BASE}/api/vision`, { method:'POST', body: fd });
+          const body = await r.json();
+          if (!r.ok) throw new Error(body.error || ('HTTP ' + r.status));
+          status.textContent = 'Done.';
+          if (body.original_url) showImage(orig, body.original_url);
+          if (body.annotated_url) showImage(anno, body.annotated_url);
+          try {
+            const openai = typeof body.openai === 'string' ? JSON.parse(body.openai) : body.openai;
+            const content = openai?.choices?.[0]?.message?.content || body.analysis || '(no content)';
+            ans.textContent = content;
+          } catch { ans.textContent = body.analysis || '(no content)'; }
+        } catch (e2) {
+          status.textContent = 'Error: ' + e2.message + ' (Tip: ensure server is on 8080 and OPENAI_API_KEY is set)';
+        }
+      });
+
+      // Generate
+      const genBtn = document.getElementById('genBtn');
+      genBtn?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const prompt = document.getElementById('genPrompt').value.trim();
+        const size = document.getElementById('genSize').value;
+        const msg = document.getElementById('genMsg');
+        const out = document.getElementById('genOut');
+        msg.textContent = 'Generating...'; out.hidden = true; out.removeAttribute('src');
+        try {
+          const r = await fetch(`${API_BASE}/api/gen-image`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ prompt, size })
+          });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+          msg.textContent = 'Done.';
+          if (j.url) showImage(out, j.url);
+        } catch (e3) {
+          msg.textContent = 'Error: ' + e3.message + ' (Tip: you need an API key and image-gen access)';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
