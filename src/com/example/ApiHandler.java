@@ -25,13 +25,16 @@ public class ApiHandler implements HttpHandler {
 
     private static byte[] bytes(String s){ return s.getBytes(StandardCharsets.UTF_8); }
     private static void write(HttpExchange ex,int code,String ctype,String body) throws IOException {
-        ex.getResponseHeaders().add("Content-Type", ctype);
-        ex.getResponseHeaders().add("Access-Control-Allow-Origin","*");
-        ex.getResponseHeaders().add("Access-Control-Allow-Headers","Content-Type, Authorization");
-        ex.getResponseHeaders().add("Access-Control-Allow-Methods","GET,POST,OPTIONS");
-        byte[] b = bytes(body);
-        ex.sendResponseHeaders(code, b.length);
-        try(OutputStream os=ex.getResponseBody()){ os.write(b); }
+    ex.getResponseHeaders().add("Content-Type", ctype);
+    ex.getResponseHeaders().add("Access-Control-Allow-Origin","*");
+    ex.getResponseHeaders().add("Access-Control-Allow-Headers","Content-Type, Authorization");
+    ex.getResponseHeaders().add("Access-Control-Allow-Methods","GET,POST,OPTIONS,HEAD");
+    byte[] b = body.getBytes(StandardCharsets.UTF_8);
+    boolean isHead = "HEAD".equalsIgnoreCase(ex.getRequestMethod());
+    ex.sendResponseHeaders(code, isHead ? 0 : b.length);
+    try (OutputStream os = ex.getResponseBody()) {
+        if (!isHead) os.write(b); // no body for HEAD
+    }
     }
 
     @Override public void handle(HttpExchange ex) throws IOException {

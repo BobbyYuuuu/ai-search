@@ -32,9 +32,12 @@ public class StaticFileHandler implements HttpHandler {
     }
 
     private void send(HttpExchange ex, int status, String type, byte[] body) throws IOException {
-        if (type != null) ex.getResponseHeaders().set("Content-Type", type);
-        ex.sendResponseHeaders(status, body.length);
-        try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+    if (type != null) ex.getResponseHeaders().set("Content-Type", type);
+    boolean isHead = "HEAD".equalsIgnoreCase(ex.getRequestMethod());
+    ex.sendResponseHeaders(status, isHead ? 0 : body.length);
+    try (OutputStream os = ex.getResponseBody()) {
+        if (!isHead) os.write(body); // no body for HEAD
+    }
     }
 
     private String contentType(File f) {
